@@ -10,7 +10,7 @@ venv/
 env/
 ENV/
 
-# Datasets
+# Datasets / generated data
 data/*
 !data/README.md
 !data/prepare.py
@@ -18,18 +18,21 @@ data/*
 !data/splits/*.txt
 
 # Model checkpoints / weights
+checkpoints/
+weights/
 *.pth
 *.pt
 *.ckpt
 *.safetensors
 
-# Training outputs
-checkpoints/
+# Training / experiment outputs
 results/
 outputs/
 experiments/
 runs/
 logs/
+*.log
+wandb/
 
 # Jupyter
 .ipynb_checkpoints/

@@ -1,0 +1,10 @@
+model:
+  name: LDSR-S2
+  bands: 10m
+  scale: 4
+  input_channels: 4
+  input_size: 128
+
+inference:
+  sampling_steps: 100
+  device: auto
