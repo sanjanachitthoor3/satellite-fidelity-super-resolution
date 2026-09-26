@@ -1,30 +1,34 @@
 import os
-from io import StringIO
-
 import requests
 import torch
 import torch.nn.functional as F
+from io import StringIO
 from omegaconf import OmegaConf
 import opensr_model
 
 
+
 # ============================================================
-# 1. Paths
+# Configuration
 # ============================================================
 
-LR_PATH = "data/lr_demo.pt"
+import sys
+
+ROI_ID = sys.argv[1] if len(sys.argv) > 1 else "ROI_1732"
 
 OUTPUT_DIR = "outputs/sr"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 OUTPUT_PATH = os.path.join(
     OUTPUT_DIR,
-    "sr_demo.pt"
+    f"{ROI_ID}_sr.pt"
 )
+
+CHECKPOINT = "weights/opensr-ldsrs2_v1_0_0.ckpt"
 
 
 # ============================================================
-# 2. Device
+# Device
 # ============================================================
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -33,7 +37,7 @@ print(f"Using device: {device}")
 
 
 # ============================================================
-# 3. Download official LDSR-S2 configuration
+# Load official LDSR-S2 configuration
 # ============================================================
 
 config_url = (
@@ -55,7 +59,7 @@ print("LDSR-S2 configuration loaded.")
 
 
 # ============================================================
-# 4. Create LDSR-S2 model
+# Create LDSR-S2 model
 # ============================================================
 
 print("Creating LDSR-S2 model...")
@@ -67,9 +71,7 @@ model = opensr_model.SRLatentDiffusion(
 
 print("Loading pretrained LDSR-S2 weights...")
 
-model.load_pretrained(
-    "weights/opensr-ldsrs2_v1_0_0.ckpt"
-)
+model.load_pretrained(CHECKPOINT)
 
 model.eval()
 
@@ -77,37 +79,43 @@ print("LDSR-S2 model loaded successfully.")
 
 
 # ============================================================
-# 5. Load our LR data
+# Load one real SEN2NAIP test ROI
 # ============================================================
 
-print(f"Loading LR data from: {LR_PATH}")
+LR_PATH = f"data/processed/{ROI_ID}/lr.pt"
+HR_PATH = f"data/processed/{ROI_ID}/hr.pt"
 
-lr_all = torch.load(
+if not os.path.exists(LR_PATH):
+    raise FileNotFoundError(LR_PATH)
+
+if not os.path.exists(HR_PATH):
+    raise FileNotFoundError(HR_PATH)
+
+lr = torch.load(
     LR_PATH,
     map_location="cpu",
-    weights_only=False
+    weights_only=True,
+).float()
+
+hr = torch.load(
+    HR_PATH,
+    map_location="cpu",
+    weights_only=True,
+).float()
+
+print()
+print(f"ROI: {ROI_ID}")
+print(f"LR shape: {lr.shape}")
+print(f"HR shape: {hr.shape}")
+print(
+    f"LR range: "
+    f"{lr.min().item():.6f} -> {lr.max().item():.6f}"
 )
 
-print(f"All LR data shape: {lr_all.shape}")
-
-# We have 5 degradation variants.
-# For the first prototype, use variant 3.
-lr = lr_all[2]
-
-print(f"Selected LR shape: {lr.shape}")
-
 
 # ============================================================
-# 6. Add batch dimension
+# Add batch dimension
 # ============================================================
-
-# Currently:
-#
-# 4 × 121 × 121
-#
-# We need:
-#
-# 1 × 4 × 121 × 121
 
 lr = lr.unsqueeze(0).float()
 
@@ -115,7 +123,7 @@ print(f"Before padding: {lr.shape}")
 
 
 # ============================================================
-# 7. PAD 121 × 121 → 128 × 128
+# Pad 121 × 121 → 128 × 128
 # ============================================================
 
 height = lr.shape[-2]
@@ -139,23 +147,10 @@ print(f"After padding: {lr.shape}")
 
 
 # ============================================================
-# 8. Convert reflectance to approximately 0–1
+# LDSR-S2 inference
 # ============================================================
-
-if lr.max() > 1:
-    lr = lr / 10000.0
-
-print(
-    f"LR range before model: "
-    f"{lr.min().item():.4f} → {lr.max().item():.4f}"
-)
 
 lr = lr.to(device)
-
-
-# ============================================================
-# 9. ACTUAL SUPER-RESOLUTION
-# ============================================================
 
 print()
 print("========================================")
@@ -172,10 +167,26 @@ with torch.no_grad():
 
 
 # ============================================================
-# 10. Save SR
+# Crop padded SR output
 # ============================================================
 
-print(f"SR output shape: {sr.shape}")
+print(f"Raw SR output shape: {sr.shape}")
+
+expected_size = 484
+
+if sr.shape[-2] < expected_size or sr.shape[-1] < expected_size:
+    raise ValueError(
+        f"SR output is too small: {sr.shape}"
+    )
+
+sr = sr[..., :expected_size, :expected_size]
+
+print(f"Valid SR shape: {sr.shape}")
+
+
+# ============================================================
+# Save
+# ============================================================
 
 torch.save(
     sr.cpu(),
@@ -185,3 +196,7 @@ torch.save(
 print()
 print("SUCCESS!")
 print(f"SR saved to: {OUTPUT_PATH}")
+print(
+    f"SR range: "
+    f"{sr.min().item():.6f} -> {sr.max().item():.6f}"
+)

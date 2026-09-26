@@ -2,23 +2,36 @@ import torch
 import opensr_degradation
 
 
-def create_naip_degradation_model(device="cpu", seed=42):
+def create_naip_degradation_model(
+    device="cpu",
+    seed=42,
+    add_noise=True,
+    reflectance_methods=None,
+):
     """
-    Create the same OpenSR NAIP-D degradation pipeline
-    used to generate the original LR images.
+    Create the OpenSR NAIP-D degradation pipeline.
+
+    By default, all available reflectance methods are created so that
+    this function remains compatible with the existing fidelity pipeline.
+
+    For refinement training, a single reflectance method can be supplied
+    to avoid unnecessary branches and models.
     """
+
+    if reflectance_methods is None:
+        reflectance_methods = [
+            "identity",
+            "gamma_lognormal",
+            "gamma_multivariate_normal",
+            "unet_histogram_matching",
+            "vae_histogram_matching",
+        ]
 
     return opensr_degradation.pipe(
         sensor="naip_d",
-        add_noise=True,
+        add_noise=add_noise,
         params={
-            "reflectance_method": [
-                "identity",
-                "gamma_lognormal",
-                "gamma_multivariate_normal",
-                "unet_histogram_matching",
-                "vae_histogram_matching",
-            ],
+            "reflectance_method": reflectance_methods,
             "noise_method": "gaussian_noise",
             "device": device,
             "seed": seed,

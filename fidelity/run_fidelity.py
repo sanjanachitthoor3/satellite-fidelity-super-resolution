@@ -10,8 +10,10 @@ from degradation.opensr_degradation import create_naip_degradation_model
 # Paths
 # --------------------------------------------------
 
-LR_PATH = "outputs/sr/lr_input.pt"
-SR_PATH = "outputs/sr/sr_demo.pt"
+ROI_ID = "ROI_1732"
+
+LR_PATH = f"data/processed/{ROI_ID}/lr.pt"
+SR_PATH = f"outputs/sr/{ROI_ID}_sr.pt"
 
 OUTPUT_DIR = "outputs/fidelity"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
