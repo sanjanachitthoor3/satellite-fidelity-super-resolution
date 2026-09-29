@@ -43,3 +43,8 @@ wandb/
 # OS
 .DS_Store
 Thumbs.db
+baseline_inputs/
+
+baseline_inputs/
+scripts/make_figure*.py
+scripts/make_pipeline_fig.py
